@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity implements NewFrameListener{
                 CameraSource.Instance().recording = !CameraSource.Instance().recording;
                 if (CameraSource.Instance().recording){
                     CameraSource.Instance().folderNeedChange = true;
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("HHmmss");
+                    SimpleDateFormat dateFormat = new SimpleDateFormat("MMddHHmmss");
                     Date now = new Date();
                     CameraSource.Instance().renewDir = dateFormat.format(now);
                     txtview.setText(CameraSource.Instance().renewDir);
