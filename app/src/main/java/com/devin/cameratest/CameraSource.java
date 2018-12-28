@@ -15,6 +15,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
+import static java.lang.Math.min;
+
 /**
  * Created by li on 2016/9/29.
  */
@@ -41,6 +43,8 @@ public class CameraSource implements Camera.PreviewCallback {
     CameraSource() {
         preWidth = 1280;
         preHeight = 720;
+//        preWidth = 640;
+//        preHeight = 480;
         isPreviewing = false;
         mFocusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO;
     }
@@ -72,6 +76,7 @@ public class CameraSource implements Camera.PreviewCallback {
     public final static int  CAMERA_DIRECTION_DEFAULT = 0;
     public final static int  CAMERA_DIRECTION_BACK = 1;
     public final static int  CAMERA_DIRECTION_FRONT = 2;
+    public final static int  CAMERA_DIRECTION_G200_FRONT = 3;
 
     public int openCamera(int direction) {
         if (camera != null) {
@@ -86,9 +91,13 @@ public class CameraSource implements Camera.PreviewCallback {
                     break;
                 case CAMERA_DIRECTION_BACK:
                     camera = Camera.open(getBackCameraIndex());
+//                    camera = Camera.open(1);
                     break;
                 case CAMERA_DIRECTION_FRONT:
                     camera = Camera.open(getFrontCameraIndex());
+                    break;
+                case CAMERA_DIRECTION_G200_FRONT:
+                    camera = Camera.open(1);
                     break;
                 default:
                     camera = Camera.open();
@@ -136,8 +145,12 @@ public class CameraSource implements Camera.PreviewCallback {
             Camera.Parameters parameters = camera.getParameters();
             parameters.setPreviewSize(preWidth, preHeight);
             parameters.setPreviewFormat(ImageFormat.NV21);
-            parameters.getSupportedPreviewFpsRange();
+//            List<int[]> tmp = parameters.getSupportedPreviewFpsRange();
+//            for (int i = 0; i < tmp.size(); i++) {
+//                Log.d(TAG, "getSupportedPreviewFpsRange: " + tmp.get(i)[0] + tmp.get(i)[1]);
+//            }
             parameters.setPreviewFpsRange(30000, 30000);
+//            parameters.setPreviewFpsRange(15000, 15000);
 
             List<String> focusModes = parameters.getSupportedFocusModes();
             if (focusModes.contains(mFocusMode)) {
@@ -200,9 +213,11 @@ public class CameraSource implements Camera.PreviewCallback {
     }
 
     public boolean recording = false;
+    public boolean recordingFull = true;
+    public boolean recordingRoi = false;
     public boolean folderNeedChange = false;
     public String renewDir = "";
-    private String dir = "";
+    private String[] dir = new String[2];
     @Override
     public void onPreviewFrame(byte[] data, Camera camera) {
         if (isPreviewing && data != null) {
@@ -214,28 +229,65 @@ public class CameraSource implements Camera.PreviewCallback {
                     Date now = new Date();
 
                     if (folderNeedChange) {
-                        dir = "/cameraData/" + renewDir;
-                        File mkDir = new File(sdRoot, dir);
+                        dir[0] = "/cameraData/Full/" + renewDir;
+                        File mkDir = new File(sdRoot, dir[0]);
                         if (!mkDir.exists()) {
                             mkDir.mkdirs();
-                            Log.d(TAG, "Make folder: " + dir);
+                            Log.d(TAG, "Make folder: " + dir[0]);
+                        } else {
+//                          Log.d(TAG, "" + "Dir existed");
+                        }
+
+                        dir[1] = "/cameraData/Roi/" + renewDir;
+                        mkDir = new File(sdRoot, dir[1]);
+                        if (!mkDir.exists()) {
+                            mkDir.mkdirs();
+                            Log.d(TAG, "Make folder: " + dir[1]);
                         } else {
 //                          Log.d(TAG, "" + "Dir existed");
                         }
                         folderNeedChange = false;
                     }
 
-                    Log.d(TAG, "Recording Folder: " + dir);
+                    Log.d(TAG, "Recording Folder: " + dir[0] + " " + dir[1]);
                     SimpleDateFormat dateFormat = new SimpleDateFormat("HH-mm-ss-SSS");
-                    File pictureFile = new File(sdRoot, dir + '/' + dateFormat.format(now) + ".nv21");
-                    if (!pictureFile.exists()) {
+                    String timeStamp = dateFormat.format(now);
+                    File pictureFile = new File(sdRoot, dir[0] + '/' + timeStamp + ".nv21");
+                    if (!pictureFile.exists() && recordingFull) {
                         try {
                             pictureFile.createNewFile();
-
                             FileOutputStream filecon = new FileOutputStream(pictureFile);
                             filecon.write(data);
+                            filecon.close();
+                        }
+                        catch (IOException e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }else{
+                        ;
+                    }
 
-                        }catch (IOException e)
+                    pictureFile = new File(sdRoot, dir[1] + '/' + timeStamp + ".nv21");
+                    if (!pictureFile.exists() && recordingRoi) {
+                        try {
+                            pictureFile.createNewFile();
+                            FileOutputStream filecon = new FileOutputStream(pictureFile);
+
+                            int drawH = (int)(min(preHeight, preWidth * DrawView.mHWratio) * DrawView.mStandardRatio);
+                            int drawW = (int)(drawH / DrawView.mHWratio);
+                            drawH = (0 == drawH % 2) ? drawH : (drawH - 1);
+                            drawW = (0 == drawW % 2) ? drawW : (drawW - 1);
+
+                            int top = (preHeight - drawH) / 2;
+                            int left = (preWidth - drawW) / 2;
+                            byte[] dstImg = new byte[drawH * drawW * 3 / 2];
+                            boolean rtv = NativeInterface.cutNV21(data, left, top, preWidth, preHeight, dstImg, drawW, drawH);
+
+                            filecon.write(dstImg);
+                            filecon.close();
+                        }
+                        catch (IOException e)
                         {
                             e.printStackTrace();
                         }
@@ -243,7 +295,6 @@ public class CameraSource implements Camera.PreviewCallback {
                 }else{
                     ;
                 }
-
 //                Log.d(TAG, "" + data.length);
 //                Log.d(TAG, "" + dateFormat.format(now));
             }
@@ -299,5 +350,4 @@ public class CameraSource implements Camera.PreviewCallback {
         camera.setParameters(parameters);
         return 0;
     }
-
 }

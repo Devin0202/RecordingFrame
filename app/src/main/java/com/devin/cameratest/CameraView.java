@@ -48,7 +48,7 @@ public class CameraView extends GLSurfaceView {
     public void surfaceCreated(SurfaceHolder holder) {
         super.surfaceCreated(holder);
 
-        CameraSource.Instance().openCamera(CameraSource.CAMERA_DIRECTION_BACK);
+        CameraSource.Instance().openCamera(CameraSource.CAMERA_DIRECTION_G200_FRONT);
     }
 
     public boolean isPreviewing() {
@@ -105,7 +105,8 @@ public class CameraView extends GLSurfaceView {
             case 3:
                 rotation = 270.0F;
         }
-        rotation = rotation - 90;
+        rotation = rotation - 0;
+//        rotation = rotation - 90;
         if (rotation == -90) {
             return 0;
         } else if (rotation == 180) {
